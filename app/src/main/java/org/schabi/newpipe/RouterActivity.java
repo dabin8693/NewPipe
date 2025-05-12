@@ -13,6 +13,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -112,6 +113,7 @@ import io.reactivex.rxjava3.schedulers.Schedulers;
  * Get the url from the intent and open it in the chosen preferred player.
  */
 public class RouterActivity extends AppCompatActivity {
+    static final String TAG = "RouterActivity";
     protected final CompositeDisposable disposables = new CompositeDisposable();
     @State
     protected int currentServiceId = -1;
@@ -238,7 +240,10 @@ public class RouterActivity extends AppCompatActivity {
                 .fromCallable(() -> {
                     try {
                         if (currentServiceId == -1) {
+                            // url이 NONE, STREAM, CHANNEL, PLAYLIST인지 찾고 서비스가 Youtube, Soundcloud, MediaCCC등 인지 찾고 반환
                             currentService = NewPipe.getServiceByUrl(url);
+                            // serviceId는 Youtube: 0, Soundcloud: 1, MediaCCC: 2  ...
+                            // serviceInfo는 [서비스이름, 컨텐츠리스트]를 담은 객체, 서비스이름은 Youtube등, 컨텐츠리스트는 [AUDIO, VIDEO, LIVE, COMMENTS]
                             currentServiceId = currentService.getServiceId();
                             currentLinkType = currentService.getLinkTypeByUrl(url);
                             currentUrl = url;
@@ -257,6 +262,7 @@ public class RouterActivity extends AppCompatActivity {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(isUrlSupported -> {
                     if (isUrlSupported) {
+                        // 다른 컴포넌트에서 공유버튼 눌렀을때
                         onSuccess();
                     } else {
                         showUnsupportedUrlDialog(url);
@@ -330,7 +336,7 @@ public class RouterActivity extends AppCompatActivity {
     protected void onSuccess() {
         final SharedPreferences preferences = PreferenceManager
                 .getDefaultSharedPreferences(this);
-
+        // 다른 컴포넌트에서 공유버튼 클릭시
         final ChoiceAvailabilityChecker choiceChecker = new ChoiceAvailabilityChecker(
                 getChoicesForService(currentService, currentLinkType),
                 preferences.getString(getString(R.string.preferred_open_action_key),
@@ -536,7 +542,7 @@ public class RouterActivity extends AppCompatActivity {
             FocusOverlayView.setupFocusObserver(alertDialogChoice);
         }
     }
-
+    // 다이얼로그에 보여줄 아이템 목록을 반환하는 메서드(4개는 기본 스트리밍이면 1~2개 더 추가)
     private List<AdapterChoiceItem> getChoicesForService(final StreamingService service,
                                                          final LinkType linkType) {
         final AdapterChoiceItem showInfo = new AdapterChoiceItem(
@@ -557,7 +563,7 @@ public class RouterActivity extends AppCompatActivity {
 
         final List<StreamingService.ServiceInfo.MediaCapability> capabilities =
                 service.getServiceInfo().getMediaCapabilities();
-
+        // 링크가 스트리밍일 경우 다운로드, 재생목록에 추가 다이얼로그 아이템에 추가
         if (linkType == LinkType.STREAM) {
             if (capabilities.contains(VIDEO)) {
                 returnedItems.add(videoPlayer);
@@ -595,7 +601,13 @@ public class RouterActivity extends AppCompatActivity {
                 returnedItems.add(backgroundPlayer);
             }
         }
-
+        for (final StreamingService.ServiceInfo.MediaCapability item : capabilities) {
+            Log.d(TAG + "601", "아이템: " + item + " // " + linkType);
+//            아이템: AUDIO // PLAYLIST
+//            아이템: VIDEO // PLAYLIST
+//            아이템: LIVE // PLAYLIST
+//            아이템: COMMENTS // PLAYLIST
+        }
         return returnedItems;
     }
 
